@@ -24,9 +24,6 @@ export function crearMobiliario(escena, fisica) {
   const piso = fisica.agregarEstatico(0, -0.08, -1);
   agregarCaja(piso, 8, 0.16, 8);
 
-  bloque(azul, 8, 2.8, 0.1, 0, 1.4, -3.2);
-  bloque(grafito, 4.8, 1.8, 0.06, 0, 1.42, -3.12);
-  bloque(cian, 4.8, 0.009, 0.02, 0, 2.33, -3.08);
   const cuadricula = new THREE.GridHelper(7, 28, 0x30516a, 0x23394e);
   cuadricula.position.set(0, 0.001, -0.28);
   escena.add(cuadricula);

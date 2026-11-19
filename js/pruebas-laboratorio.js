@@ -8,6 +8,7 @@ import { distribucionValida } from './distribucion.js';
 import { crearAgarres } from './agarre.js';
 import { crearInteraccion } from './interaccion.js';
 import { crearPanelVR } from './panel-vr.js';
+import { crearAmbiente } from './ambiente.js';
 
 function exigir(condicion, mensaje) {
   if (!condicion) throw new Error(mensaje);
@@ -41,7 +42,7 @@ export function ejecutarPruebasLaboratorio() {
   }
 
   verificar('Gravedad, registro de cuerpos y mobiliario', () => {
-    exigir(fisica.mundo.gravity.x === 0 && fisica.mundo.gravity.y === -4.2 && fisica.mundo.gravity.z === 0,
+    exigir(fisica.mundo.gravity.x === 0 && fisica.mundo.gravity.y === -3.6 && fisica.mundo.gravity.z === 0,
       'El mundo debe aplicar la nueva gravedad');
     exigir(fisica.mundo.bodies.length === 29, 'Se esperan 20 cuerpos dinámicos y 9 estáticos');
     exigir(lab.cuerposMesas.length === 4, 'Deben existir cuatro mesas');
@@ -51,6 +52,18 @@ export function ejecutarPruebasLaboratorio() {
         exigir(Math.abs(otra.x - mesa.x) >= MESA.ancho || Math.abs(otra.z - mesa.z) >= MESA.fondo, 'Mesas superpuestas');
       }
     }
+  });
+
+  verificar('Ambiente opaco con decoración agrupada y sin sombras', () => {
+    const ambiente = crearAmbiente();
+    escena.add(ambiente);
+    const renderizables = ambiente.children.filter((objeto) => objeto.geometry);
+    exigir(renderizables.length === 5 && renderizables.filter((objeto) => objeto.isInstancedMesh).length === 2,
+      'La decoración debe conservar sus cinco lotes de dibujo');
+    exigir(renderizables.every(({ material }) => !material.transparent)
+      && ambiente.children.filter((objeto) => objeto.isLight).every((luz) => !luz.castShadow),
+    'Se requiere un fondo opaco y luces sin sombras dinámicas');
+    exigir(lab.superficies.every((objeto) => objeto.parent !== ambiente), 'Una decoración bloquea la selección');
   });
 
   verificar('Inventario y 64 inicializaciones consecutivas', () => {
@@ -97,6 +110,7 @@ export function ejecutarPruebasLaboratorio() {
     const altura = primera.position.y;
     pasos(fisica, 1);
     exigir(primera.position.y < altura, 'La gravedad no hizo descender la pieza');
+    exigir(Math.abs(primera.velocity.y / PASO_FISICO + 3.6) < 1e-6, 'La aceleración real de la pieza no coincide con la gravedad');
     pasos(fisica, 180);
     for (const { id, cuerpo } of lab.piezas) {
       exigir(Math.abs(limites(cuerpo).lowerBound.y - MESA.altura) < 0.01, id + ' quedó por encima o debajo de su cubierta');
@@ -328,11 +342,11 @@ export function ejecutarPruebasLaboratorio() {
     iniciarPartida();
     const cubo = lab.piezas.find(({ categoria }) => categoria === 'cubo');
     const { min, max } = ambar.volumen;
-    colocarCuerpo(cubo.cuerpo, max.x - 0.07, min.y + cubo.base, (min.z + max.z) / 2, Math.PI / 4);
-    cubo.cuerpo.velocity.x = 0.2;
-    cubo.cuerpo.angularVelocity.y = 0.8;
+    colocarCuerpo(cubo.cuerpo, max.x - 0.055, min.y + cubo.base, (min.z + max.z) / 2, Math.PI / 4);
+    cubo.cuerpo.velocity.x = 0.28;
+    cubo.cuerpo.angularVelocity.y = 1.1;
     clasificacion.liberar(cubo);
-    const cuadros = Math.round(0.25 / PASO_FISICO);
+    const cuadros = Math.ceil(0.18 / PASO_FISICO);
     for (let i = 0; i < cuadros; i++) {
       clasificacion.evaluar(PASO_FISICO, reloj, (aviso) => avisos.push(aviso));
       exigir(avisos.length === (i === cuadros - 1 ? 1 : 0), 'La ventana de permanencia no se respetó');

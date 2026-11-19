@@ -52,7 +52,7 @@ export function crearClasificacion(piezas, recipientes) {
       inversa.mult(cuerpo.quaternion, orientacion);
       let dentro = true;
       let cruzaInterior = false;
-      const { tolerancia, ocupacionMinima, profundidadMinima } = CLASIFICACION;
+      const { tolerancia, ocupacionMinima, profundidadMinima, inmersionMinima } = CLASIFICACION;
       for (const [i, forma] of cuerpo.shapes.entries()) {
         orientacion.vmult(cuerpo.shapeOffsets[i], posicionForma);
         posicionForma.vadd(centro, posicionForma);
@@ -68,7 +68,7 @@ export function crearClasificacion(piezas, recipientes) {
         dentro &&= minForma.x >= min.x - tolerancia && maxForma.x <= max.x + tolerancia
           && minForma.z >= min.z - tolerancia && maxForma.z <= max.z + tolerancia
           && minForma.y >= min.y - tolerancia && max.y - centro.y >= profundidadMinima
-          && ancho * alto * fondo >= volumenForma * ocupacionMinima;
+          && alto >= inmersionMinima && ancho * alto * fondo >= volumenForma * ocupacionMinima;
       }
       if (!cruzaInterior) continue;
       observado.recipiente = recipiente;

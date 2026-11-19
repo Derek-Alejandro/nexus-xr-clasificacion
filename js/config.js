@@ -2,7 +2,7 @@ export const MESA = Object.freeze({ ancho: 0.74, fondo: 0.92, altura: 0.78, gros
 export const RECIPIENTE = Object.freeze({ ancho: 0.48, fondo: 0.42, alto: 0.20, grosor: 0.02, z: -0.21 });
 
 export const FISICA = Object.freeze({
-  gravedad: -4.2, paso: 1 / 60, subpasos: 4, saltoMaximo: 0.25,
+  gravedad: -3.6, paso: 1 / 60, subpasos: 4, saltoMaximo: 0.25,
   amortiguacionLineal: 0.05, amortiguacionAngular: 0.08,
   velocidadReposo: 0.07, tiempoReposo: 0.7,
   contactos: Object.freeze({
@@ -21,8 +21,8 @@ export const FISICA = Object.freeze({
 });
 
 export const CLASIFICACION = Object.freeze({
-  tolerancia: 0.025, estabilidad: 0.25, velocidad: 0.26, velocidadAngular: 1.0, avisoMs: 2200,
-  ocupacionMinima: 0.65, profundidadMinima: 0.045,
+  tolerancia: 0.035, estabilidad: 0.18, velocidad: 0.30, velocidadAngular: 1.25, avisoMs: 2200,
+  ocupacionMinima: 0.52, profundidadMinima: 0.035, inmersionMinima: 0.065,
   diagnostico: true,
 });
 

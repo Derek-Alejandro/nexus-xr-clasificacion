@@ -10,14 +10,11 @@ import { crearXR } from './xr.js';
 import { crearAudio } from './audio.js';
 import { crearAgarres } from './agarre.js';
 import { CLASIFICACION } from './config.js';
+import { crearAmbiente } from './ambiente.js';
 
 export function crearVistaPrevia(contenedor, informarCarga, informarXR) {
   const escena = new THREE.Scene();
-  escena.background = new THREE.Color(0x080f1d);
-  escena.add(new THREE.HemisphereLight(0xd7efff, 0x54718e, 1.65));
-  const luz = new THREE.DirectionalLight(0xecfaff, 2.05);
-  luz.position.set(2, 4, 1);
-  escena.add(luz);
+  escena.add(crearAmbiente());
 
   const fisica = crearFisica();
   const agarres = crearAgarres(fisica.mundo);
