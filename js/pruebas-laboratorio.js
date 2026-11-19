@@ -41,7 +41,7 @@ export function ejecutarPruebasLaboratorio() {
   }
 
   verificar('Gravedad, registro de cuerpos y mobiliario', () => {
-    exigir(fisica.mundo.gravity.x === 0 && fisica.mundo.gravity.y === -5.5 && fisica.mundo.gravity.z === 0,
+    exigir(fisica.mundo.gravity.x === 0 && fisica.mundo.gravity.y === -4.2 && fisica.mundo.gravity.z === 0,
       'El mundo debe aplicar la nueva gravedad');
     exigir(fisica.mundo.bodies.length === 29, 'Se esperan 20 cuerpos dinámicos y 9 estáticos');
     exigir(lab.cuerposMesas.length === 4, 'Deben existir cuatro mesas');
@@ -56,7 +56,8 @@ export function ejecutarPruebasLaboratorio() {
   verificar('Inventario y 64 inicializaciones consecutivas', () => {
     exigir(lab.piezas.length === 20 && new Set(lab.piezas.map(({ id }) => id)).size === 20, 'Inventario incorrecto');
     exigir(lab.piezas.every(({ cuerpo, colisionador }) => cuerpo.mass > 0 && cuerpo.shapes[0] === colisionador
-      && cuerpo.linearDamping === 0.20 && cuerpo.angularDamping === 0.35), 'Cuerpo, colisionador o amortiguación incorrectos');
+      && cuerpo.mass >= 0.08 && cuerpo.mass <= 0.14 && cuerpo.linearDamping === 0.05
+      && cuerpo.angularDamping === 0.08), 'Cuerpo, colisionador o amortiguación incorrectos');
     for (let i = 0; i < 64; i++) {
       for (const { id } of CATALOGO) {
         exigir(lab.piezas.filter(({ categoria }) => categoria === id).length === 5, 'Cantidad incorrecta por categoría');
@@ -204,7 +205,7 @@ export function ejecutarPruebasLaboratorio() {
       agarres.apuntar(izquierda, new Vector3(1, 1.8, 1));
       simularAgarre(1);
       exigir(inicio.distanceTo(pieza.cuerpo.position) < 0.05, 'El cuerpo saltó en el primer paso');
-      simularAgarre(95);
+      simularAgarre(58);
       const { x, y, z } = pieza.cuerpo.position;
       exigir(x > 0.65 && y > 1.5 && z > 0.85, 'La figura no siguió el movimiento tridimensional');
       sincronizarObjetos(lab.piezas);
@@ -304,6 +305,39 @@ export function ejecutarPruebasLaboratorio() {
     clasificacion.liberar(otra);
     avanzarPartida(150);
     exigir(clasificacion.resumen(reloj).errores === 2, 'No se permitió un nuevo intento');
+  });
+
+  verificar('Depósito cerca de una pared y rechazo de una figura sobre el borde', () => {
+    iniciarPartida();
+    const { min, max } = cian.volumen;
+    const z = (min.z + max.z) / 2;
+    colocarCuerpo(pieza.cuerpo, max.x - pieza.base - 0.001, max.y + 0.20, z);
+    clasificacion.liberar(pieza);
+    avanzarPartida(130);
+    exigir(clasificacion.clasificada(pieza), 'El depósito junto a la pared no se confirmó');
+
+    colocarCuerpo(otra.cuerpo, max.x - 0.004, max.y + otra.base, z);
+    clasificacion.liberar(otra);
+    for (let i = 0; i < 40; i++) {
+      clasificacion.evaluar(PASO_FISICO, reloj, (aviso) => avisos.push(aviso));
+    }
+    exigir(avisos.length === 1, 'Apareció un resultado para una figura apoyada sobre el borde');
+  });
+
+  verificar('Colisionador girado con holgura y velocidades residuales', () => {
+    iniciarPartida();
+    const cubo = lab.piezas.find(({ categoria }) => categoria === 'cubo');
+    const { min, max } = ambar.volumen;
+    colocarCuerpo(cubo.cuerpo, max.x - 0.07, min.y + cubo.base, (min.z + max.z) / 2, Math.PI / 4);
+    cubo.cuerpo.velocity.x = 0.2;
+    cubo.cuerpo.angularVelocity.y = 0.8;
+    clasificacion.liberar(cubo);
+    const cuadros = Math.round(0.25 / PASO_FISICO);
+    for (let i = 0; i < cuadros; i++) {
+      clasificacion.evaluar(PASO_FISICO, reloj, (aviso) => avisos.push(aviso));
+      exigir(avisos.length === (i === cuadros - 1 ? 1 : 0), 'La ventana de permanencia no se respetó');
+    }
+    exigir(clasificacion.clasificada(cubo), 'Se rechazó una figura girada dentro de la tolerancia');
   });
 
   verificar('Agarre dentro del recipiente, liberación y actualización del HUD', () => {

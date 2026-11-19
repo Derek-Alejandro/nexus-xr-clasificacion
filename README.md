@@ -16,16 +16,16 @@ Los módulos son nativos del navegador y se publican como archivos estáticos, s
 
 ## Implementación física
 
-- El mundo de cannon-es aplica gravedad de −5,5 m/s² y avanza a 1/60 s con hasta cuatro subpasos por cuadro. Las figuras usan amortiguación lineal de 0,20 y angular de 0,35. La restitución en recipientes es 0,10. Los valores se ajustan en `js/config.js`.
+- El mundo de cannon-es aplica gravedad de −4,2 m/s² y avanza a 1/60 s con hasta cuatro subpasos por cuadro. Las figuras pesan entre 0,08 y 0,14 kg, con amortiguación lineal de 0,05, angular de 0,08 y restitución de 0,10 en los recipientes. Los valores se ajustan en `js/config.js`.
 - El piso, las mesas y los recipientes son estáticos. Cada recipiente tiene cinco colisionadores, una base y cuatro paredes. El volumen útil es un conjunto de coordenadas para la etapa 5.
 - Hay cinco esferas cian, cinco cubos ámbar, cinco pirámides magenta y cinco prismas hexagonales violetas. Cada figura conserva su ID. Las esferas y los cubos usan primitivas. La pirámide y el prisma usan poliedros convexos definidos por los mismos vértices que su malla.
 - Cada mesa recibe una figura de cada categoría y una adicional. El generador por semilla baraja la categoría extra, los IDs, las posiciones y las orientaciones, verificando las huellas antes de colocar los cuerpos. El reinicio reutiliza los cuerpos y las mallas.
-- La pinza conserva el punto de contacto y la distancia inicial del rayo. El ancla cinemática mueve la figura mediante una restricción punto a punto y el cuerpo conserva sus contactos. Al soltar, se limita la velocidad lineal a 1,2 m/s y la angular a 2,5 rad/s. Ante pérdida de seguimiento se retira la restricción y se anulan las velocidades antes de que actúe la gravedad.
+- La pinza conserva el punto de contacto y la distancia inicial del rayo. El ancla cinemática se aproxima al objetivo a un máximo de 1,65 m/s. La restricción limita el impulso según la masa y conserva los contactos. Al soltar, se limita la velocidad lineal a 1,6 m/s y la angular a 2,5 rad/s. Ante pérdida de seguimiento se retira la restricción y se anulan las velocidades antes de que actúe la gravedad.
 - Si una figura libre sale de los límites del escenario o se estabiliza en el suelo, vuelve a una posición libre de su mesa de origen. Si la mesa está temporalmente ocupada, espera a que haya espacio. Las figuras depositadas en recipientes se mantienen allí mediante colisión.
 
 ## Clasificación y cronómetro
 
-Pulsa **Comenzar** en VR. Puedes introducir la figura con la pinza y soltarla dentro, o soltarla por encima de la boca. El HUD confirma el depósito tras medio segundo de estabilidad dentro del recipiente. Cada acierto suma una figura al progreso. Cada error confirmado resta un punto de los 20 disponibles, sin restar aciertos. Las caídas fuera de un recipiente no cuentan como intentos.
+Pulsa **Comenzar** en VR. Puedes soltar la figura dentro del recipiente o por encima de la boca. El HUD confirma el depósito tras 0,25 s de permanencia, con una tolerancia espacial de 2,5 cm y velocidades residuales admisibles. Una figura apoyada contra una pared interior puede contar. Cada acierto suma al progreso y cada error confirmado resta un punto de los 20 disponibles. Las caídas fuera de un recipiente no cuentan como intentos.
 
 El cronómetro se pausa al salir u ocultar la sesión, se reanuda al volver y se detiene al llegar a 20 aciertos. Cada recipiente muestra **Pendiente** hasta su quinto acierto. **Reiniciar** genera otra distribución y restaura las métricas.
 

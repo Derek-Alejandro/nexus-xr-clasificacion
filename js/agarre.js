@@ -26,7 +26,8 @@ export function crearAgarres(mundo) {
         type: Body.KINEMATIC, position: objetivo, collisionFilterMask: 0, allowSleep: false,
       });
       // GSSolver limita el impulso del subpaso en cada ecuación.
-      const restriccion = new PointToPointConstraint(cuerpo, pivote, ancla, new Vec3(), AJUSTES.fuerzaPorEje * PASO_FISICO);
+      const impulsoMaximo = cuerpo.mass * AJUSTES.aceleracionPorEje * PASO_FISICO;
+      const restriccion = new PointToPointConstraint(cuerpo, pivote, ancla, new Vec3(), impulsoMaximo);
       mundo.addBody(ancla);
       mundo.addConstraint(restriccion);
       porMano.set(mano, { pieza, ancla, restriccion, objetivo });

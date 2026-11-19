@@ -90,3 +90,11 @@ La suite de Chrome incluye el uso del colisionador real, casos con rebote y sali
 **Resultado del 19 de noviembre de 2026:** 16/16 casos pasaron en Chrome headless, con los CDN reales y el proyecto servido desde el subdirectorio `/nexus-xr-clasificacion-32/`. La vista previa llegó a `ready` y se creó el lienzo. La prueba automatizada verificó depósitos desde dentro y desde arriba, HUD, penalización de un punto, rechazo de duplicados, finalización 20/20 y restauración completa. La corrección en Quest 3 sigue pendiente.
 
 Para diagnosticar depósitos, filtra **NEXUS XR · Clasificación** en Console. Cada fase se registra una sola vez por intento e incluye figura, categoría, recipiente, coordenadas, contención, velocidades y tiempo de estabilización. Cambia `CLASIFICACION.diagnostico` a `false` en `js/config.js` para desactivar estos mensajes.
+
+### Ajuste de tolerancia y agilidad · 19 de noviembre de 2026
+
+**Resultado en Chrome headless:** 18/18 casos con los CDN reales. Se verificaron un depósito físico junto a una pared, el rechazo de una figura sobre el borde, la admisión de un colisionador girado con holgura y velocidad residual, el agarre 3D en menos pasos y la contención al empujar una pared con la figura sujeta. También pasaron los casos de duplicados, finalización y reinicio.
+
+El clasificador comprueba 0,25 s continuos con velocidades de hasta 0,26 m/s y 1,0 rad/s. El margen espacial es de 2,5 cm. La comprobación usa la caja envolvente del colisionador orientado en el espacio local del recipiente. Exige al menos 65 % de solapamiento con el interior real y que el cuerpo se adentre 4,5 cm por debajo de la boca, medidos hasta su origen. Esto admite depósitos junto a las paredes y excluye una figura que solo descansa sobre el borde.
+
+**Pendiente en Quest 3:** deposita una figura al centro y otra contra una pared, mantén una tercera sujeta dentro y comprueba que solo cuenta al soltarla. Prueba una figura que toque el borde y salga antes de confirmar. Con ambas manos, compara elevaciones rápidas, lanzamientos cortos y el contacto al empujar contra el recipiente. Termina con un depósito incorrecto y un reinicio para comprobar que los puntos y el reloj conservan su comportamiento.

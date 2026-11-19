@@ -2,16 +2,16 @@ export const MESA = Object.freeze({ ancho: 0.74, fondo: 0.92, altura: 0.78, gros
 export const RECIPIENTE = Object.freeze({ ancho: 0.48, fondo: 0.42, alto: 0.20, grosor: 0.02, z: -0.21 });
 
 export const FISICA = Object.freeze({
-  gravedad: -5.5, paso: 1 / 60, subpasos: 4, saltoMaximo: 0.25,
-  amortiguacionLineal: 0.20, amortiguacionAngular: 0.35,
+  gravedad: -4.2, paso: 1 / 60, subpasos: 4, saltoMaximo: 0.25,
+  amortiguacionLineal: 0.05, amortiguacionAngular: 0.08,
   velocidadReposo: 0.07, tiempoReposo: 0.7,
   contactos: Object.freeze({
     pieza: [0.38, 0.10], soporte: [0.62, 0.08], recipiente: [0.55, 0.10],
   }),
   agarre: Object.freeze({
-    velocidadAncla: 0.95, velocidadSujeta: 1.45, velocidadLibre: 1.2,
-    velocidadAngular: 3.5, velocidadAngularLibre: 2.5,
-    inerciaLiberacion: 0.78, fuerzaPorEje: 14, suavizado: 12,
+    velocidadAncla: 1.65, velocidadSujeta: 1.85, velocidadLibre: 1.6,
+    velocidadAngular: 4, velocidadAngularLibre: 2.5,
+    inerciaLiberacion: 0.88, aceleracionPorEje: 90, suavizado: 20,
     alturaMinima: 0.10, alturaMaxima: 2.7,
   }),
   recuperacion: Object.freeze({
@@ -21,7 +21,8 @@ export const FISICA = Object.freeze({
 });
 
 export const CLASIFICACION = Object.freeze({
-  tolerancia: 0.006, estabilidad: 0.5, velocidad: 0.12, velocidadAngular: 0.6, avisoMs: 2200,
+  tolerancia: 0.025, estabilidad: 0.25, velocidad: 0.26, velocidadAngular: 1.0, avisoMs: 2200,
+  ocupacionMinima: 0.65, profundidadMinima: 0.045,
   diagnostico: true,
 });
 
@@ -33,8 +34,8 @@ export const MESAS = Object.freeze([
 ]);
 
 export const CATALOGO = Object.freeze([
-  { id: 'esfera', nombre: 'Esfera', simbolo: '●', color: 0x46dfee, ancho: 0.12, alto: 0.12, masa: 0.20 },
-  { id: 'cubo', nombre: 'Cubo', simbolo: '■', color: 0xffb747, ancho: 0.12, alto: 0.12, masa: 0.24 },
-  { id: 'piramide', nombre: 'Pirámide', simbolo: '▲', color: 0xf45cc7, ancho: 0.13, alto: 0.14, masa: 0.18 },
-  { id: 'prisma', nombre: 'Prisma hexagonal', simbolo: '⬢', color: 0xb190ff, ancho: 0.13, alto: 0.12, masa: 0.22 },
+  { id: 'esfera', nombre: 'Esfera', simbolo: '●', color: 0x46dfee, ancho: 0.12, alto: 0.12, masa: 0.10 },
+  { id: 'cubo', nombre: 'Cubo', simbolo: '■', color: 0xffb747, ancho: 0.12, alto: 0.12, masa: 0.14 },
+  { id: 'piramide', nombre: 'Pirámide', simbolo: '▲', color: 0xf45cc7, ancho: 0.13, alto: 0.14, masa: 0.08 },
+  { id: 'prisma', nombre: 'Prisma hexagonal', simbolo: '⬢', color: 0xb190ff, ancho: 0.13, alto: 0.12, masa: 0.12 },
 ]);

@@ -52,16 +52,23 @@ export function crearClasificacion(piezas, recipientes) {
       inversa.mult(cuerpo.quaternion, orientacion);
       let dentro = true;
       let cruzaInterior = false;
-      const holgura = CLASIFICACION.tolerancia;
+      const { tolerancia, ocupacionMinima, profundidadMinima } = CLASIFICACION;
       for (const [i, forma] of cuerpo.shapes.entries()) {
         orientacion.vmult(cuerpo.shapeOffsets[i], posicionForma);
         posicionForma.vadd(centro, posicionForma);
         orientacion.mult(cuerpo.shapeOrientations[i], rotacionForma);
         forma.calculateWorldAABB(posicionForma, rotacionForma, minForma, maxForma);
         cruzaInterior ||= minForma.y < max.y && maxForma.y > min.y;
-        dentro &&= minForma.x >= min.x - holgura && maxForma.x <= max.x + holgura
-          && minForma.z >= min.z - holgura && maxForma.z <= max.z + holgura
-          && minForma.y >= min.y - holgura && maxForma.y <= max.y;
+        // La tolerancia admite contacto con las paredes. La ocupación se mide en
+        // el interior real para excluir figuras apoyadas en el borde exterior.
+        const ancho = Math.max(0, Math.min(maxForma.x, max.x) - Math.max(minForma.x, min.x));
+        const alto = Math.max(0, Math.min(maxForma.y, max.y) - Math.max(minForma.y, min.y));
+        const fondo = Math.max(0, Math.min(maxForma.z, max.z) - Math.max(minForma.z, min.z));
+        const volumenForma = (maxForma.x - minForma.x) * (maxForma.y - minForma.y) * (maxForma.z - minForma.z);
+        dentro &&= minForma.x >= min.x - tolerancia && maxForma.x <= max.x + tolerancia
+          && minForma.z >= min.z - tolerancia && maxForma.z <= max.z + tolerancia
+          && minForma.y >= min.y - tolerancia && max.y - centro.y >= profundidadMinima
+          && ancho * alto * fondo >= volumenForma * ocupacionMinima;
       }
       if (!cruzaInterior) continue;
       observado.recipiente = recipiente;
