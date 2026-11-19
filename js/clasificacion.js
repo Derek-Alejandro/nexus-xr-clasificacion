@@ -1,3 +1,4 @@
+import { Quaternion, Vec3 } from 'cannon-es';
 import { CATALOGO, CLASIFICACION } from './config.js';
 
 export function formatearTiempo(ms) {
@@ -8,6 +9,7 @@ export function formatearTiempo(ms) {
 export function crearClasificacion(piezas, recipientes) {
   const intentosActivos = new Map();
   const correctas = new Set();
+  const liberadas = new Set();
   const categorias = CATALOGO.map((forma) => ({ ...forma, aciertos: 0, tiempo: null }));
   const porCategoria = new Map(categorias.map((fila) => [fila.id, fila]));
   let estado = 'lista';
@@ -25,10 +27,59 @@ export function crearClasificacion(piezas, recipientes) {
     inicio = null;
   }
 
-  function cabeHorizontal(xMin, xMax, zMin, zMax, min, max) {
-    const holgura = CLASIFICACION.tolerancia;
-    return xMin >= min.x - holgura && xMax <= max.x + holgura
-      && zMin >= min.z - holgura && zMax <= max.z + holgura;
+  const inversa = new Quaternion();
+  const orientacion = new Quaternion();
+  const rotacionForma = new Quaternion();
+  const centro = new Vec3();
+  const posicionForma = new Vec3();
+  const minForma = new Vec3();
+  const maxForma = new Vec3();
+  const observado = { recipiente: null, dentro: false };
+
+  function observar(cuerpo) {
+    observado.recipiente = null;
+    observado.dentro = false;
+    for (const recipiente of recipientes) {
+      const caja = recipiente.cuerpo;
+      const { min, max } = recipiente.interior;
+      caja.quaternion.conjugate(inversa);
+      cuerpo.position.vsub(caja.position, centro);
+      inversa.vmult(centro, centro);
+      if (centro.x < min.x || centro.x > max.x || centro.z < min.z || centro.z > max.z
+        || centro.y - cuerpo.boundingRadius >= max.y || centro.y + cuerpo.boundingRadius <= min.y) continue;
+
+      // Proyectar cada forma en coordenadas del recipiente antes de calcular sus límites.
+      inversa.mult(cuerpo.quaternion, orientacion);
+      let dentro = true;
+      let cruzaInterior = false;
+      const holgura = CLASIFICACION.tolerancia;
+      for (const [i, forma] of cuerpo.shapes.entries()) {
+        orientacion.vmult(cuerpo.shapeOffsets[i], posicionForma);
+        posicionForma.vadd(centro, posicionForma);
+        orientacion.mult(cuerpo.shapeOrientations[i], rotacionForma);
+        forma.calculateWorldAABB(posicionForma, rotacionForma, minForma, maxForma);
+        cruzaInterior ||= minForma.y < max.y && maxForma.y > min.y;
+        dentro &&= minForma.x >= min.x - holgura && maxForma.x <= max.x + holgura
+          && minForma.z >= min.z - holgura && maxForma.z <= max.z + holgura
+          && minForma.y >= min.y - holgura && maxForma.y <= max.y;
+      }
+      if (!cruzaInterior) continue;
+      observado.recipiente = recipiente;
+      observado.dentro = dentro;
+      return observado;
+    }
+    return observado;
+  }
+
+  function registrar(pieza, intento, fase, recipiente = null, dentro = false) {
+    if (!CLASIFICACION.diagnostico || intento.registros.has(fase)) return;
+    intento.registros.add(fase);
+    const { position: { x, y, z }, velocity, angularVelocity } = pieza.cuerpo;
+    console.info('NEXUS XR · Clasificación · ' + fase, {
+      figura: pieza.id, categoria: pieza.categoria, recipiente: recipiente?.id ?? null,
+      posicion: { x, y, z }, dentro, velocidadLineal: velocity.length(),
+      velocidadAngular: angularVelocity.length(), segundosEstables: intento.estable,
+    });
   }
 
   function confirmar(pieza, recipiente, ahora) {
@@ -76,64 +127,50 @@ export function crearClasificacion(piezas, recipientes) {
       estado = 'en-curso';
     },
     clasificada(pieza) { return correctas.has(pieza); },
-    cancelar(pieza) { intentosActivos.delete(pieza); },
+    cancelar(pieza) {
+      const intento = intentosActivos.get(pieza);
+      if (intento) registrar(pieza, intento, 'Intento cancelado por nueva captura o recuperación', intento.recipiente);
+      intentosActivos.delete(pieza);
+      liberadas.delete(pieza);
+    },
     liberar(pieza) {
-      if (estado !== 'en-curso' || correctas.has(pieza) || intentosActivos.has(pieza)) return;
-      const { cuerpo } = pieza;
-      if (cuerpo.aabbNeedsUpdate) cuerpo.updateAABB();
-      const { lowerBound: min, upperBound: max } = cuerpo.aabb;
-      intentosActivos.set(pieza, { recipiente: null, estable: 0, xMin: min.x, xMax: max.x, zMin: min.z, zMax: max.z, y: min.y });
+      if (estado !== 'en-curso' || correctas.has(pieza) || liberadas.has(pieza)) return;
+      const { recipiente, dentro } = observar(pieza.cuerpo);
+      const intento = { recipiente, estable: 0, registros: new Set() };
+      liberadas.add(pieza);
+      intentosActivos.set(pieza, intento);
+      registrar(pieza, intento, 'Figura liberada', recipiente, dentro);
     },
     evaluar(dt, ahora, informar) {
       if (estado !== 'en-curso') return;
-      const { tolerancia, estabilidad, velocidad, velocidadAngular } = CLASIFICACION;
+      const { estabilidad, velocidad, velocidadAngular } = CLASIFICACION;
       for (const [pieza, intento] of intentosActivos) {
         const { cuerpo } = pieza;
-        if (cuerpo.aabbNeedsUpdate) cuerpo.updateAABB();
-        const { lowerBound: min, upperBound: max } = cuerpo.aabb;
-        if (!intento.recipiente && min.y < intento.y) {
-          for (const recipiente of recipientes) {
-            const boca = recipiente.volumen.max.y;
-            if (intento.y < boca || min.y >= boca) continue;
-            const t = (boca - intento.y) / (min.y - intento.y);
-            const mezclar = (a, b) => a + (b - a) * t;
-            if (cabeHorizontal(
-              mezclar(intento.xMin, min.x), mezclar(intento.xMax, max.x),
-              mezclar(intento.zMin, min.z), mezclar(intento.zMax, max.z),
-              recipiente.volumen.min, recipiente.volumen.max,
-            )) {
-              intento.recipiente = recipiente;
-              break;
-            }
+        const { recipiente, dentro } = observar(cuerpo);
+        if (recipiente !== intento.recipiente) {
+          intento.estable = 0;
+          intento.recipiente = recipiente;
+          registrar(pieza, intento, recipiente ? 'Recipiente detectado' : 'Salió del volumen', recipiente, dentro);
+        }
+        const estable = dentro && cuerpo.velocity.lengthSquared() <= velocidad ** 2
+          && cuerpo.angularVelocity.lengthSquared() <= velocidadAngular ** 2;
+        if (estable) {
+          registrar(pieza, intento, 'Estabilización en curso', recipiente, dentro);
+          intento.estable += dt;
+          if (intento.estable + 1e-9 >= estabilidad) {
+            const resultado = confirmar(pieza, recipiente, ahora);
+            registrar(pieza, intento, resultado.tipo === 'error' ? 'Error confirmado' : 'Acierto confirmado', recipiente, true);
+            informar(resultado);
+            if (estado === 'completada') break;
+          }
+        } else {
+          if (intento.estable > 0) registrar(pieza, intento, 'Estabilización interrumpida por movimiento o salida', recipiente, dentro);
+          intento.estable = 0;
+          if (pieza.estadoFisico === 'reposo') {
+            registrar(pieza, intento, 'Descartada: quedó en reposo fuera del volumen válido', recipiente, dentro);
+            intentosActivos.delete(pieza);
           }
         }
-        if (intento.recipiente) {
-          const { volumen } = intento.recipiente;
-          const dentroXZ = cabeHorizontal(min.x, max.x, min.z, max.z, volumen.min, volumen.max);
-          const { position } = cuerpo;
-          // En el impacto puede haber penetración transitoria antes de que el solver separe los cuerpos.
-          if (position.x < volumen.min.x || position.x > volumen.max.x
-            || position.z < volumen.min.z || position.z > volumen.max.z
-            || min.y >= volumen.max.y || max.y <= volumen.min.y) {
-            intento.recipiente = null;
-            intento.estable = 0;
-          } else {
-            const estable = dentroXZ && min.y >= volumen.min.y - tolerancia && max.y <= volumen.max.y
-              && cuerpo.velocity.lengthSquared() <= velocidad ** 2
-              && cuerpo.angularVelocity.lengthSquared() <= velocidadAngular ** 2;
-            intento.estable = estable ? intento.estable + dt : 0;
-            if (intento.estable + 1e-9 >= estabilidad) informar(confirmar(pieza, intento.recipiente, ahora));
-          }
-        }
-        if (!intento.recipiente && pieza.estadoFisico === 'reposo') {
-          intentosActivos.delete(pieza);
-          continue;
-        }
-        intento.xMin = min.x;
-        intento.xMax = max.x;
-        intento.zMin = min.z;
-        intento.zMax = max.z;
-        intento.y = min.y;
       }
     },
     get pendiente() { return estado === 'en-curso' && intentosActivos.size > 0; },
@@ -150,6 +187,7 @@ export function crearClasificacion(piezas, recipientes) {
     },
     reiniciar() {
       intentosActivos.clear();
+      liberadas.clear();
       correctas.clear();
       for (const fila of categorias) {
         fila.aciertos = 0;

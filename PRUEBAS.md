@@ -1,4 +1,4 @@
-# Pruebas de aceptación · NEXUS XR 3.2 · Etapas 3 y 4
+# Pruebas de aceptación · NEXUS XR 3.2 · Etapas 3 a 5
 
 ## Suite física en Chrome
 
@@ -70,3 +70,23 @@ En **Console**, filtra por `NEXUS XR` para ver sesión, mano detectada o perdida
 - El agarre conserva la profundidad inicial del rayo. El movimiento de la mano y su ángulo modifican el objetivo. La figura puede girar como resultado de la restricción y los contactos.
 - Las colisiones son discretas y la contención se comprobó en escenarios controlados. Las pruebas del visor deben cubrir distintos ángulos de contacto, movimientos bruscos y el rendimiento con las dos manos activas.
 - La extensión verifica el camino de eventos WebXR. La precisión del tracking, las oclusiones reales y el confort requieren el visor.
+
+## Corrección de clasificación y gravedad · Etapa 5
+
+La primera prueba física de la etapa 4, realizada por el usuario, confirmó entrada a VR, visualización, seguimiento de manos y manipulación de figuras. La nueva corrección requiere otra ronda en Quest 3.
+
+| Prueba | Procedimiento en Quest 3 | Resultado esperado |
+|---|---|---|
+| Inicio y reloj | Entra por HTTPS, espera y activa **Comenzar**. | Antes de comenzar, 00:00, 0/20 de progreso y 20/20 puntos. El reloj arranca al comenzar. |
+| Depósito con la pinza dentro | Mantén una esfera dentro del recipiente cian con la pinza cerrada. Luego abre la pinza y espera a que se asiente. | Mientras está sujeta no cuenta. Al asentarse una vez liberada, aparece la confirmación, progreso 1/20 y 20/20 puntos. |
+| Entrada desde arriba y rebotes | Suelta una figura desde encima de la boca. Repite con una que toque un borde y acabe fuera. | La que se asienta dentro cuenta una vez. La que sale del recipiente deja las estadísticas intactas. |
+| Penalización y reintento | Deposita una esfera en el recipiente ámbar. Déjala varios segundos. Recupérala y deposítala de nuevo. | Cada depósito equivocado confirmado resta un punto. La permanencia en el recipiente no vuelve a penalizar. |
+| Gravedad y liberación | Alterna ambas manos. Deja caer y lanza suavemente hacia una mesa y un recipiente desde varias alturas. | Caída más suave, lanzamientos cortos y contactos físicos. Una figura que acaba en el piso regresa a un lugar libre sin afectar las métricas. |
+| Suspensión y regreso | Sal de VR durante la partida. Espera y vuelve a entrar. | El tiempo fuera de VR queda excluido y se conserva el avance. |
+| Final y reinicio | Completa los cuatro recipientes. Pulsa **Reiniciar**. | 20/20 congela el reloj y muestra los cuatro tiempos. Tras reiniciar se vacían los recipientes y se restauran todos los indicadores. |
+
+La suite de Chrome incluye el uso del colisionador real, casos con rebote y salida, límites de velocidad, fórmulas, pausa, reinicio y comprobación del texto que se dibuja en la textura del HUD. Las pruebas de pausa de la suite ejercitan el reloj de actividad. La salida y reentrada de una sesión real se comprueban con el emulador o el visor.
+
+**Resultado del 19 de noviembre de 2026:** 16/16 casos pasaron en Chrome headless, con los CDN reales y el proyecto servido desde el subdirectorio `/nexus-xr-clasificacion-32/`. La vista previa llegó a `ready` y se creó el lienzo. La prueba automatizada verificó depósitos desde dentro y desde arriba, HUD, penalización de un punto, rechazo de duplicados, finalización 20/20 y restauración completa. La corrección en Quest 3 sigue pendiente.
+
+Para diagnosticar depósitos, filtra **NEXUS XR · Clasificación** en Console. Cada fase se registra una sola vez por intento e incluye figura, categoría, recipiente, coordenadas, contención, velocidades y tiempo de estabilización. Cambia `CLASIFICACION.diagnostico` a `false` en `js/config.js` para desactivar estos mensajes.

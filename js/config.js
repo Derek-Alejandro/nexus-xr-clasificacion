@@ -2,14 +2,14 @@ export const MESA = Object.freeze({ ancho: 0.74, fondo: 0.92, altura: 0.78, gros
 export const RECIPIENTE = Object.freeze({ ancho: 0.48, fondo: 0.42, alto: 0.20, grosor: 0.02, z: -0.21 });
 
 export const FISICA = Object.freeze({
-  gravedad: -9.81, paso: 1 / 60, subpasos: 4, saltoMaximo: 0.25,
-  amortiguacionLineal: 0.33, amortiguacionAngular: 0.58,
+  gravedad: -5.5, paso: 1 / 60, subpasos: 4, saltoMaximo: 0.25,
+  amortiguacionLineal: 0.20, amortiguacionAngular: 0.35,
   velocidadReposo: 0.07, tiempoReposo: 0.7,
   contactos: Object.freeze({
-    pieza: [0.38, 0.10], soporte: [0.62, 0.08], recipiente: [0.55, 0.04],
+    pieza: [0.38, 0.10], soporte: [0.62, 0.08], recipiente: [0.55, 0.10],
   }),
   agarre: Object.freeze({
-    velocidadAncla: 0.95, velocidadSujeta: 1.45, velocidadLibre: 1.5,
+    velocidadAncla: 0.95, velocidadSujeta: 1.45, velocidadLibre: 1.2,
     velocidadAngular: 3.5, velocidadAngularLibre: 2.5,
     inerciaLiberacion: 0.78, fuerzaPorEje: 14, suavizado: 12,
     alturaMinima: 0.10, alturaMaxima: 2.7,
@@ -21,7 +21,8 @@ export const FISICA = Object.freeze({
 });
 
 export const CLASIFICACION = Object.freeze({
-  tolerancia: 0.006, estabilidad: 0.5, velocidad: 0.05, velocidadAngular: 0.25, avisoMs: 2200,
+  tolerancia: 0.006, estabilidad: 0.5, velocidad: 0.12, velocidadAngular: 0.6, avisoMs: 2200,
+  diagnostico: true,
 });
 
 export const MESAS = Object.freeze([

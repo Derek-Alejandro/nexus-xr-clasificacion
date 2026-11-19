@@ -78,11 +78,15 @@ export function crearMobiliario(escena, fisica) {
     malla.position.set(x, y + grosor + alto * 0.60, centroZ + fondo / 2 + grosor + 0.001);
     escena.add(malla);
 
+    const interior = {
+      min: { x: -ancho / 2, y: grosor, z: -fondo / 2 },
+      max: { x: ancho / 2, y: grosor + alto, z: fondo / 2 },
+    };
     recipientes.push({
-      id: 'recipiente-' + categoria.id, categoria: categoria.id, mesaId: mesa.id, cuerpo, material,
+      id: 'recipiente-' + categoria.id, categoria: categoria.id, mesaId: mesa.id, cuerpo, material, interior,
       volumen: {
-        min: { x: x - ancho / 2, y: y + grosor, z: centroZ - fondo / 2 },
-        max: { x: x + ancho / 2, y: y + grosor + alto, z: centroZ + fondo / 2 },
+        min: { x: x + interior.min.x, y: y + interior.min.y, z: centroZ + interior.min.z },
+        max: { x: x + interior.max.x, y: y + interior.max.y, z: centroZ + interior.max.z },
       },
     });
   }

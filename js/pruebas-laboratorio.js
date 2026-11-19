@@ -7,6 +7,7 @@ import { crearLaboratorio } from './laboratorio.js';
 import { distribucionValida } from './distribucion.js';
 import { crearAgarres } from './agarre.js';
 import { crearInteraccion } from './interaccion.js';
+import { crearPanelVR } from './panel-vr.js';
 
 function exigir(condicion, mensaje) {
   if (!condicion) throw new Error(mensaje);
@@ -40,7 +41,8 @@ export function ejecutarPruebasLaboratorio() {
   }
 
   verificar('Gravedad, registro de cuerpos y mobiliario', () => {
-    exigir(fisica.mundo.gravity.y === -9.81, 'Gravedad incorrecta');
+    exigir(fisica.mundo.gravity.x === 0 && fisica.mundo.gravity.y === -5.5 && fisica.mundo.gravity.z === 0,
+      'El mundo debe aplicar la nueva gravedad');
     exigir(fisica.mundo.bodies.length === 29, 'Se esperan 20 cuerpos dinámicos y 9 estáticos');
     exigir(lab.cuerposMesas.length === 4, 'Deben existir cuatro mesas');
     exigir(lab.recipientes.every(({ cuerpo }) => cuerpo.shapes.length === 5), 'Un recipiente carece de su base y cuatro paredes');
@@ -53,6 +55,8 @@ export function ejecutarPruebasLaboratorio() {
 
   verificar('Inventario y 64 inicializaciones consecutivas', () => {
     exigir(lab.piezas.length === 20 && new Set(lab.piezas.map(({ id }) => id)).size === 20, 'Inventario incorrecto');
+    exigir(lab.piezas.every(({ cuerpo, colisionador }) => cuerpo.mass > 0 && cuerpo.shapes[0] === colisionador
+      && cuerpo.linearDamping === 0.20 && cuerpo.angularDamping === 0.35), 'Cuerpo, colisionador o amortiguación incorrectos');
     for (let i = 0; i < 64; i++) {
       for (const { id } of CATALOGO) {
         exigir(lab.piezas.filter(({ categoria }) => categoria === id).length === 5, 'Cantidad incorrecta por categoría');
@@ -292,10 +296,57 @@ export function ejecutarPruebasLaboratorio() {
       && resumen.intentos === 2 && resumen.precision === 50 && avisos[1]?.tipo === 'error', 'Cálculo de métricas incorrecto');
     avanzarPartida(120);
     exigir(clasificacion.resumen(reloj).errores === 1, 'Error repetido mientras la pieza queda depositada');
+    clasificacion.liberar(otra);
+    avanzarPartida(50);
+    exigir(clasificacion.resumen(reloj).errores === 1, 'La misma liberación se registró otra vez');
+    clasificacion.cancelar(otra);
     posicionDeposito(otra, ambar);
     clasificacion.liberar(otra);
     avanzarPartida(150);
     exigir(clasificacion.resumen(reloj).errores === 2, 'No se permitió un nuevo intento');
+  });
+
+  verificar('Agarre dentro del recipiente, liberación y actualización del HUD', () => {
+    iniciarPartida();
+    const { min, max } = cian.volumen;
+    const objetivo = new Vector3((min.x + max.x) / 2, min.y + pieza.base + 0.025, (min.z + max.z) / 2);
+    posicionDeposito(pieza, cian);
+    const panel = crearPanelVR();
+    const pantalla = panel.grupo.children[1];
+    const ctx = pantalla.material.map.image.getContext('2d');
+    const textos = [];
+    const escribir = ctx.fillText.bind(ctx);
+    ctx.fillText = (valor, ...args) => { textos.push(valor); escribir(valor, ...args); };
+    try {
+      agarres.iniciar(izquierda, pieza, pieza.cuerpo.position);
+      agarres.apuntar(izquierda, objetivo);
+      simularAgarre(105);
+      exigir(limites(pieza.cuerpo).upperBound.y < max.y && clasificacion.resumen(reloj).intentos === 0,
+        'La pieza debe estar dentro y seguir sin puntuación durante la pinza');
+      agarres.terminar(izquierda, true);
+      clasificacion.liberar(pieza);
+      avanzarPartida(145);
+      exigir(clasificacion.resumen(reloj).aciertos === 1, 'No se confirmó la pieza soltada dentro');
+      panel.mostrarActividad(clasificacion.resumen(reloj), clasificacion.categorias);
+      panel.dibujarSiCambio();
+      exigir(textos.includes('1/20') && textos.includes('20/20') && textos.includes('1/5')
+        && textos.some((texto) => texto.includes('depósito correcto')), 'El HUD no mostró el resultado confirmado');
+      textos.length = 0;
+      posicionDeposito(otra, ambar);
+      clasificacion.liberar(otra);
+      avanzarPartida(100);
+      panel.mostrarActividad(clasificacion.resumen(reloj), clasificacion.categorias);
+      panel.dibujarSiCambio();
+      exigir(textos.includes('1/20') && textos.includes('19/20')
+        && textos.some((texto) => texto.includes('Categoría incorrecta')), 'El HUD no mostró la penalización');
+    } finally {
+      agarres.cancelarTodo();
+      panel.grupo.traverse(({ geometry, material }) => {
+        geometry?.dispose();
+        material?.map?.dispose();
+        material?.dispose();
+      });
+    }
   });
 
   verificar('Descarta piezas sujetas, fuera, inestables y rebotes por la boca', () => {
@@ -325,11 +376,17 @@ export function ejecutarPruebasLaboratorio() {
     muestra(max.y + 0.2);
     for (let i = 0; i <= estable; i++) muestra(max.y + 0.2);
     exigir(!avisos.length && clasificacion.resumen(reloj).intentos === 0, 'El rebote activó el contador');
+    for (let i = 0; i < estable - 2; i++) muestra(min.y + pieza.base);
+    exigir(!avisos.length, 'Se reutilizó el tiempo de estabilidad anterior al rebote');
+    muestra(min.y + pieza.base + 0.03, 0.35);
+    for (let i = 0; i <= estable; i++) muestra(min.y + pieza.base);
+    exigir(avisos.length === 1 && avisos[0].tipo === 'exito', 'El rebote con asentamiento posterior debe confirmar el depósito');
   });
 
   verificar('Puntuación acotada y tiempos por categoría hasta 20/20', () => {
     iniciarPartida();
     for (let i = 0; i < 21; i++) {
+      clasificacion.cancelar(pieza);
       posicionDeposito(pieza, ambar);
       clasificacion.liberar(pieza);
       avanzarPartida(100);
@@ -340,6 +397,7 @@ export function ejecutarPruebasLaboratorio() {
       const figuras = lab.piezas.filter(({ categoria }) => categoria === recipiente.categoria);
       const categoria = clasificacion.categorias.find(({ id }) => id === recipiente.categoria);
       for (const [i, figura] of figuras.entries()) {
+        clasificacion.cancelar(figura);
         posicionDeposito(figura, recipiente, (i % 3 - 1) * 0.15, i < 3 ? -0.09 : 0.09);
         clasificacion.liberar(figura);
         avanzarPartida(135);

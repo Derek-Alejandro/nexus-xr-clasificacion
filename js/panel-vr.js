@@ -68,7 +68,7 @@ export function crearPanelVR() {
       + '    Precisión ' + datos.precision.toFixed(1).replace('.', ',') + ' %', 32, 360, 28);
 
     const aviso = datos.aviso;
-    const mensaje = aviso?.texto ?? (datos.estado === 'lista' ? 'Pulsa Comenzar para iniciar.' : 'Suelta la figura por encima de la boca.');
+    const mensaje = aviso?.texto ?? (datos.estado === 'lista' ? 'Pulsa Comenzar para iniciar.' : 'Suelta la figura y deja que se asiente dentro.');
     texto(mensaje, 32, 415, 32, aviso ? (aviso.tipo === 'error' ? '#ff9696' : '#7cf1a9') : '#b2cce4');
   });
   pantalla.malla.position.z = 0.021;
