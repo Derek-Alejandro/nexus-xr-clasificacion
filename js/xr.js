@@ -231,7 +231,9 @@ export function crearXR(renderer, escena, conectarEntrada, informar) {
         }, opciones);
         nueva.addEventListener('inputsourceschange', sincronizarFuentes, opciones);
         nueva.addEventListener('visibilitychange', () => {
-          if (nueva.visibilityState === 'visible') return;
+          const visible = nueva.visibilityState === 'visible';
+          entrada.visibilidad?.(visible);
+          if (visible) return;
           for (const [lado, mano] of pares) retirar(lado, mano);
         }, opciones);
         for (const tipo of ['selectstart', 'select', 'selectend']) {
@@ -241,6 +243,7 @@ export function crearXR(renderer, escena, conectarEntrada, informar) {
         if (sesion !== nueva) return;
         sincronizarFuentes();
         publicarManos();
+        entrada.visibilidad?.(nueva.visibilityState === 'visible');
         entrada.anunciar('Sesión VR iniciada. Muestra las manos para comenzar.');
         informar('active', 'Sesión VR iniciada. Las manos se detectan dentro de VR.');
       } catch (error) {

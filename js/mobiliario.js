@@ -79,7 +79,7 @@ export function crearMobiliario(escena, fisica) {
     escena.add(malla);
 
     recipientes.push({
-      id: 'recipiente-' + categoria.id, categoria: categoria.id, mesaId: mesa.id, cuerpo,
+      id: 'recipiente-' + categoria.id, categoria: categoria.id, mesaId: mesa.id, cuerpo, material,
       volumen: {
         min: { x: x - ancho / 2, y: y + grosor, z: centroZ - fondo / 2 },
         max: { x: x + ancho / 2, y: y + grosor + alto, z: centroZ + fondo / 2 },

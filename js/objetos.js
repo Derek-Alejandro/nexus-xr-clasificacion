@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Body, Box, ConvexPolyhedron, Sphere, Vec3 } from 'cannon-es';
-import { CATALOGO } from './config.js';
+import { CATALOGO, FISICA } from './config.js';
 
 function crearConvexo(forma) {
   const { ancho, alto, id } = forma;
@@ -71,7 +71,8 @@ export function crearObjetos(escena, fisica) {
 
       const cuerpo = new Body({
         mass: forma.masa, shape: colisionador, material: fisica.materiales.pieza,
-        linearDamping: 0.18, angularDamping: 0.45, sleepSpeedLimit: 0.07, sleepTimeLimit: 0.7,
+        linearDamping: FISICA.amortiguacionLineal, angularDamping: FISICA.amortiguacionAngular,
+        sleepSpeedLimit: FISICA.velocidadReposo, sleepTimeLimit: FISICA.tiempoReposo,
       });
       fisica.mundo.addBody(cuerpo);
       return {

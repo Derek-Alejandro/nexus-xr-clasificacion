@@ -1,25 +1,21 @@
 import { Body, Box, ContactMaterial, Material, Vec3, World } from 'cannon-es';
+import { FISICA } from './config.js';
 
-export const PASO_FISICO = 1 / 60;
-const MAX_SUBPASOS = 4;
+export const PASO_FISICO = FISICA.paso;
 
 export function agregarCaja(cuerpo, ancho, alto, fondo, x = 0, y = 0, z = 0) {
   cuerpo.addShape(new Box(new Vec3(ancho / 2, alto / 2, fondo / 2)), new Vec3(x, y, z));
 }
 
 export function crearFisica() {
-  const mundo = new World({ gravity: new Vec3(0, -9.81, 0), allowSleep: true });
+  const mundo = new World({ gravity: new Vec3(0, FISICA.gravedad, 0), allowSleep: true });
   const materiales = {
     pieza: new Material('figura'),
     soporte: new Material('mesa y piso'),
     recipiente: new Material('recipiente'),
   };
-  for (const [superficie, friction, restitution] of [
-    [materiales.pieza, 0.33, 0.16],
-    [materiales.soporte, 0.55, 0.14],
-    [materiales.recipiente, 0.48, 0.10],
-  ]) {
-    mundo.addContactMaterial(new ContactMaterial(materiales.pieza, superficie, { friction, restitution }));
+  for (const [tipo, [friction, restitution]] of Object.entries(FISICA.contactos)) {
+    mundo.addContactMaterial(new ContactMaterial(materiales.pieza, materiales[tipo], { friction, restitution }));
   }
 
   let anterior = null;
@@ -40,13 +36,13 @@ export function crearFisica() {
     avanzar(tiempo, antesDePaso, despuesDePaso) {
       const delta = anterior === null ? 0 : (tiempo - anterior) / 1000;
       anterior = tiempo;
-      if (!Number.isFinite(delta) || delta < 0 || delta > 0.25) {
+      if (!Number.isFinite(delta) || delta < 0 || delta > FISICA.saltoMaximo) {
         acumulado = 0;
         return false;
       }
-      acumulado = Math.min(acumulado + delta, PASO_FISICO * MAX_SUBPASOS);
+      acumulado = Math.min(acumulado + delta, PASO_FISICO * FISICA.subpasos);
       let subpasos = 0;
-      while (acumulado + 1e-9 >= PASO_FISICO && subpasos < MAX_SUBPASOS) {
+      while (acumulado + 1e-9 >= PASO_FISICO && subpasos < FISICA.subpasos) {
         antesDePaso?.(PASO_FISICO);
         mundo.step(PASO_FISICO);
         despuesDePaso?.(PASO_FISICO);

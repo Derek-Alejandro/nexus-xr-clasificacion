@@ -1,5 +1,5 @@
 import { Ray, Scene, Vector3 } from 'three';
-import { CATALOGO, MESA, MESAS } from './config.js';
+import { CATALOGO, CLASIFICACION, FISICA, MESA, MESAS } from './config.js';
 import { agregarCaja, crearFisica, PASO_FISICO } from './fisica.js';
 import { crearMobiliario } from './mobiliario.js';
 import { crearObjetos, colocarCuerpo, sincronizarObjetos } from './objetos.js';
@@ -166,6 +166,7 @@ export function ejecutarPruebasLaboratorio() {
 
   verificar('Raycasting con oclusión y selección única por pinza', () => {
     lab.reiniciar();
+    lab.clasificacion.comenzada(0);
     const interaccion = crearInteraccion(lab, agarres, lab.superficies, [], () => {});
     const rayo = new Ray(new Vector3(), new Vector3(0, 0, -1));
     const { x, y, z } = pieza.origen;
@@ -199,13 +200,17 @@ export function ejecutarPruebasLaboratorio() {
       agarres.apuntar(izquierda, new Vector3(1, 1.8, 1));
       simularAgarre(1);
       exigir(inicio.distanceTo(pieza.cuerpo.position) < 0.05, 'El cuerpo saltó en el primer paso');
-      simularAgarre(78);
+      simularAgarre(95);
       const { x, y, z } = pieza.cuerpo.position;
       exigir(x > 0.65 && y > 1.5 && z > 0.85, 'La figura no siguió el movimiento tridimensional');
       sincronizarObjetos(lab.piezas);
       exigir(pieza.malla.position.distanceTo(pieza.cuerpo.position) < 1e-8, 'Malla y cuerpo desalineados');
+      pieza.cuerpo.velocity.set(5, 0, 0);
+      pieza.cuerpo.angularVelocity.set(0, 12, 0);
       agarres.terminar(izquierda, true);
-      exigir(pieza.cuerpo.velocity.length() <= 1.20001, 'Velocidad de liberación excesiva');
+      exigir(pieza.cuerpo.velocity.length() <= FISICA.agarre.velocidadLibre + 1e-5
+        && pieza.cuerpo.angularVelocity.length() <= FISICA.agarre.velocidadAngularLibre + 1e-5,
+      'Velocidad de liberación excesiva');
       simularAgarre(30);
       exigir(pieza.cuerpo.position.y < y - 0.3, 'La gravedad no actuó después de soltar');
     } finally {
@@ -247,6 +252,123 @@ export function ejecutarPruebasLaboratorio() {
     } finally {
       agarres.cancelarTodo();
     }
+  });
+
+  const clasificacion = lab.clasificacion;
+  const [cian, ambar] = lab.recipientes;
+  let reloj = 0;
+  const avisos = [];
+
+  function iniciarPartida() {
+    lab.reiniciar();
+    reloj = 1000;
+    avisos.length = 0;
+    clasificacion.comenzada(reloj);
+  }
+
+  function avanzarPartida(pasosFisicos) {
+    for (let i = 0; i < pasosFisicos; i++) {
+      fisica.mundo.step(PASO_FISICO);
+      reloj += PASO_FISICO * 1000;
+      clasificacion.evaluar(PASO_FISICO, reloj, (aviso) => avisos.push(aviso));
+    }
+  }
+
+  function posicionDeposito(figura, { volumen: { min, max } }, columna = 0, fila = 0) {
+    colocarCuerpo(figura.cuerpo, (min.x + max.x) / 2 + columna, max.y + 0.22, (min.z + max.z) / 2 + fila);
+  }
+
+  verificar('Depósitos físicos correcto e incorrecto, puntos e intento único', () => {
+    iniciarPartida();
+    posicionDeposito(pieza, cian);
+    clasificacion.liberar(pieza);
+    avanzarPartida(150);
+    exigir(clasificacion.clasificada(pieza) && avisos[0]?.tipo === 'exito', 'No se confirmó el acierto físico');
+    posicionDeposito(otra, ambar);
+    clasificacion.liberar(otra);
+    avanzarPartida(150);
+    const resumen = clasificacion.resumen(reloj);
+    exigir(resumen.aciertos === 1 && resumen.errores === 1 && resumen.puntos === 19
+      && resumen.intentos === 2 && resumen.precision === 50 && avisos[1]?.tipo === 'error', 'Cálculo de métricas incorrecto');
+    avanzarPartida(120);
+    exigir(clasificacion.resumen(reloj).errores === 1, 'Error repetido mientras la pieza queda depositada');
+    posicionDeposito(otra, ambar);
+    clasificacion.liberar(otra);
+    avanzarPartida(150);
+    exigir(clasificacion.resumen(reloj).errores === 2, 'No se permitió un nuevo intento');
+  });
+
+  verificar('Descarta piezas sujetas, fuera, inestables y rebotes por la boca', () => {
+    iniciarPartida();
+    const { min, max } = cian.volumen;
+    const x = (min.x + max.x) / 2;
+    const z = (min.z + max.z) / 2;
+    function muestra(y, vx = 0, dx = 0) {
+      colocarCuerpo(pieza.cuerpo, x + dx, y, z);
+      pieza.cuerpo.velocity.x = vx;
+      clasificacion.evaluar(PASO_FISICO, reloj, (aviso) => avisos.push(aviso));
+    }
+    const estable = Math.ceil(CLASIFICACION.estabilidad / PASO_FISICO);
+    posicionDeposito(pieza, cian);
+    for (let i = 0; i <= estable; i++) muestra(min.y + pieza.base);
+    exigir(!avisos.length, 'Se puntuó una figura sin liberación');
+    muestra(max.y + 0.12, 0, 0.34);
+    clasificacion.liberar(pieza);
+    for (let i = 0; i <= estable; i++) muestra(min.y + pieza.base, 0, 0.34);
+    exigir(!avisos.length, 'Se puntuó una figura fuera');
+    clasificacion.cancelar(pieza);
+    muestra(max.y + 0.12);
+    clasificacion.liberar(pieza);
+    for (let i = 0; i <= estable; i++) muestra(min.y + pieza.base, 0.35);
+    exigir(!avisos.length, 'Se confirmó antes de estabilizar');
+    for (let i = 0; i < estable - 3; i++) muestra(min.y + pieza.base);
+    muestra(max.y + 0.2);
+    for (let i = 0; i <= estable; i++) muestra(max.y + 0.2);
+    exigir(!avisos.length && clasificacion.resumen(reloj).intentos === 0, 'El rebote activó el contador');
+  });
+
+  verificar('Puntuación acotada y tiempos por categoría hasta 20/20', () => {
+    iniciarPartida();
+    for (let i = 0; i < 21; i++) {
+      posicionDeposito(pieza, ambar);
+      clasificacion.liberar(pieza);
+      avanzarPartida(100);
+    }
+    exigir(clasificacion.resumen(reloj).errores === 21 && clasificacion.resumen(reloj).puntos === 0,
+      'Las penalizaciones no respetaron el límite inferior');
+    for (const recipiente of lab.recipientes) {
+      const figuras = lab.piezas.filter(({ categoria }) => categoria === recipiente.categoria);
+      const categoria = clasificacion.categorias.find(({ id }) => id === recipiente.categoria);
+      for (const [i, figura] of figuras.entries()) {
+        posicionDeposito(figura, recipiente, (i % 3 - 1) * 0.15, i < 3 ? -0.09 : 0.09);
+        clasificacion.liberar(figura);
+        avanzarPartida(135);
+        exigir(categoria.aciertos === i + 1 && (i === 4 ? categoria.tiempo > 0 : categoria.tiempo === null),
+          'Progreso o tiempo incorrecto para ' + categoria.id);
+      }
+    }
+    const final = clasificacion.resumen(reloj);
+    exigir(final.aciertos === 20 && final.estado === 'completada' && final.puntos === 0
+      && final.intentos === 41 && Math.abs(final.precision - 2000 / 41) < 1e-6 && final.aviso?.tipo === 'final',
+    'El reto no finalizó con las métricas correctas');
+    exigir(clasificacion.resumen(reloj + 50000).tiempoMs === final.tiempoMs, 'El cronómetro siguió tras finalizar');
+  });
+
+  verificar('Comenzar, pausa, reentrada y restauración completa', () => {
+    iniciarPartida();
+    exigir(!clasificacion.comenzada(1250), 'Comenzar reinició un reto activo');
+    clasificacion.pausar(3500);
+    exigir(clasificacion.resumen(10000).tiempoMs === 2500 && clasificacion.estado === 'pausa', 'No se congeló el reloj');
+    clasificacion.reanudar(12000);
+    exigir(clasificacion.resumen(13500).tiempoMs === 4000, 'Se contabilizó el tiempo fuera de la sesión');
+    const anterior = firma();
+    lab.reiniciar();
+    const reinicio = clasificacion.resumen(30000);
+    exigir(reinicio.estado === 'lista' && reinicio.tiempoMs === 0 && reinicio.aciertos === 0
+      && reinicio.puntos === 20 && reinicio.errores === 0 && reinicio.intentos === 0 && reinicio.precision === 0
+      && clasificacion.categorias.every(({ tiempo, aciertos }) => tiempo === null && aciertos === 0)
+      && firma() !== anterior && fisica.mundo.bodies.length === 29 && !fisica.mundo.constraints.length,
+    'El reinicio dejó datos, cuerpos o restricciones anteriores');
   });
 
   fisica.liberar();

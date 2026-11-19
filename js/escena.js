@@ -9,6 +9,7 @@ import { crearInteraccion } from './interaccion.js';
 import { crearXR } from './xr.js';
 import { crearAudio } from './audio.js';
 import { crearAgarres } from './agarre.js';
+import { CLASIFICACION } from './config.js';
 
 export function crearVistaPrevia(contenedor, informarCarga, informarXR) {
   const escena = new THREE.Scene();
@@ -22,6 +23,7 @@ export function crearVistaPrevia(contenedor, informarCarga, informarXR) {
   const agarres = crearAgarres(fisica.mundo);
   const mobiliario = crearMobiliario(escena, fisica);
   const laboratorio = crearLaboratorio(fisica, crearObjetos(escena, fisica), mobiliario);
+  const { clasificacion } = laboratorio;
   const panel = crearPanelVR();
   escena.add(panel.grupo);
   const audio = crearAudio();
@@ -46,6 +48,7 @@ export function crearVistaPrevia(contenedor, informarCarga, informarXR) {
   let necesitaRender = true;
   let gestionandoXR = false;
   let interaccion;
+  let destelloHasta = 0;
   const tamanoVista = new THREE.Vector2();
 
   function invalidar() {
@@ -58,14 +61,45 @@ export function crearVistaPrevia(contenedor, informarCarga, informarXR) {
     invalidar();
   }
 
+  function actualizarVisibilidad(visible) {
+    const ahora = performance.now();
+    if (visible) clasificacion.reanudar(ahora);
+    else clasificacion.pausar(ahora);
+    fisica.interrumpir();
+    invalidar();
+  }
+
+  function informarDeposito(aviso) {
+    destelloHasta = performance.now() + CLASIFICACION.avisoMs;
+    audio.reproducir(aviso.tipo);
+    console.info('NEXUS XR · ' + aviso.texto, aviso.piezaId);
+  }
+
+  function actualizarIndicadores(tiempo) {
+    const resumen = clasificacion.resumen(tiempo);
+    panel.mostrarActividad(resumen, clasificacion.categorias);
+    const aviso = resumen.aviso;
+    for (const recipiente of mobiliario.recipientes) {
+      const orientacion = laboratorio.piezas.some((pieza) => pieza.recipienteId === recipiente.id && agarres.estaSujeta(pieza));
+      const confirmar = aviso?.recipienteId === recipiente.id && tiempo < destelloHasta;
+      recipiente.material.emissive.setHex(confirmar ? (aviso.tipo === 'error' ? 0xff4444 : 0x54ed98) : recipiente.material.color.getHex());
+      recipiente.material.emissiveIntensity = confirmar ? 0.24 : orientacion ? 0.14 : 0;
+    }
+  }
+
   const xr = crearXR(renderer, escena, (salir) => {
     interaccion = crearInteraccion(laboratorio, agarres, mobiliario.superficies, panel.botones, (id) => {
-      if (id === 'salir-vr') void salir();
+      if (id === 'salir-vr') {
+        actualizarVisibilidad(false);
+        void salir();
+      }
       if (id === 'reiniciar') reiniciar();
+      if (id === 'comenzar') clasificacion.comenzada(performance.now());
     });
     return {
       ...interaccion,
       manos: panel.mostrarManos,
+      visibilidad: actualizarVisibilidad,
       anunciar: (mensaje) => console.info('NEXUS XR · ' + mensaje),
     };
   }, (estado, mensaje) => {
@@ -74,6 +108,7 @@ export function crearVistaPrevia(contenedor, informarCarga, informarXR) {
     controles.enabled = !gestionandoXR;
     fisica.interrumpir();
     if (anterior && !gestionandoXR) {
+      actualizarVisibilidad(false);
       controles.reset();
       redimensionar();
       invalidar();
@@ -106,10 +141,12 @@ export function crearVistaPrevia(contenedor, informarCarga, informarXR) {
       if (frame) {
         escena.updateMatrixWorld();
         if (!xr.actualizar(frame)) return;
+        if (clasificacion.estado === 'pausa') clasificacion.reanudar(tiempo);
       }
-      const hayMovimiento = laboratorio.paso(tiempo, agarres);
+      const hayMovimiento = laboratorio.paso(tiempo, agarres, informarDeposito);
       if (!frame && !necesitaRender && !hayMovimiento) return;
       necesitaRender = false;
+      actualizarIndicadores(tiempo);
       panel.dibujarSiCambio();
       renderer.render(escena, camara);
     } catch (error) {

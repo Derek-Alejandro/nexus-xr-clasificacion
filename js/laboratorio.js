@@ -1,12 +1,16 @@
-import { MESA, MESAS, RECIPIENTE } from './config.js';
+import { FISICA, MESA, MESAS, RECIPIENTE } from './config.js';
 import { distribuirPiezas } from './distribucion.js';
 import { colocarCuerpo, sincronizarObjetos } from './objetos.js';
+import { crearClasificacion } from './clasificacion.js';
+
+const RECUPERACION = FISICA.recuperacion;
 
 export function crearLaboratorio(fisica, piezas, mobiliario, semillaInicial) {
   let semilla = semillaInicial ?? crypto.getRandomValues(new Uint32Array(1))[0];
   const { recipientes } = mobiliario;
   const piezasPorId = new Map(piezas.map((pieza) => [pieza.id, pieza]));
   const tiempoEnPiso = new Map();
+  const clasificacion = crearClasificacion(piezas, recipientes);
 
   function redistribuir() {
     tiempoEnPiso.clear();
@@ -15,7 +19,8 @@ export function crearLaboratorio(fisica, piezas, mobiliario, semillaInicial) {
   }
 
   function fueraDeSala({ x, y, z }) {
-    return y < -0.25 || Math.abs(x) > 4.1 || z < -5.1 || z > 3.1;
+    return y < RECUPERACION.yMin || Math.abs(x) > RECUPERACION.xMax
+      || z < RECUPERACION.zMin || z > RECUPERACION.zMax;
   }
 
   function recuperar(pieza) {
@@ -38,6 +43,7 @@ export function crearLaboratorio(fisica, piezas, mobiliario, semillaInicial) {
       });
       if (!libre) continue;
       colocarCuerpo(pieza.cuerpo, x, pieza.origen.y, z, giro);
+      clasificacion.cancelar(pieza);
       tiempoEnPiso.delete(pieza);
       console.info('NEXUS XR · Figura recuperada en su mesa de origen', pieza.id);
       return;
@@ -47,16 +53,17 @@ export function crearLaboratorio(fisica, piezas, mobiliario, semillaInicial) {
   function recuperarFueraDeMesa(dt, agarres) {
     for (const pieza of piezas) {
       const { position, velocity } = pieza.cuerpo;
-      if (agarres?.estaSujeta(pieza) || (position.y > 0.21 && !fueraDeSala(position))) {
+      if (clasificacion.clasificada(pieza) || agarres?.estaSujeta(pieza)
+        || (position.y > RECUPERACION.alturaPiso && !fueraDeSala(position))) {
         tiempoEnPiso.delete(pieza);
         continue;
       }
       if (fueraDeSala(position)) {
         recuperar(pieza);
-      } else if (velocity.lengthSquared() < 0.09) {
+      } else if (velocity.lengthSquared() < RECUPERACION.velocidadPiso ** 2) {
         const espera = (tiempoEnPiso.get(pieza) ?? 0) + dt;
         tiempoEnPiso.set(pieza, espera);
-        if (espera >= 0.8) recuperar(pieza);
+        if (espera >= RECUPERACION.esperaPiso) recuperar(pieza);
       } else {
         tiempoEnPiso.delete(pieza);
       }
@@ -65,26 +72,30 @@ export function crearLaboratorio(fisica, piezas, mobiliario, semillaInicial) {
 
   redistribuir();
   return {
-    piezas, piezasPorId, ...mobiliario,
+    piezas, piezasPorId, clasificacion, ...mobiliario,
     get semilla() { return semilla; },
     reiniciar() {
       semilla = (semilla + 1) >>> 0;
+      clasificacion.reiniciar();
       redistribuir();
     },
-    paso(tiempo, agarres) {
-      if (piezas.every(({ estadoFisico, cuerpo }) =>
-        estadoFisico === 'reposo' && cuerpo.position.y > 0.21 && !fueraDeSala(cuerpo.position))) {
+    paso(tiempo, agarres, informar = () => {}) {
+      if (clasificacion.estado === 'pausa' || (!clasificacion.pendiente && piezas.every((pieza) =>
+        pieza.estadoFisico === 'reposo' && (clasificacion.clasificada(pieza)
+          || (pieza.cuerpo.position.y > RECUPERACION.alturaPiso && !fueraDeSala(pieza.cuerpo.position)))))) {
         fisica.interrumpir();
         return false;
       }
       if (!fisica.avanzar(tiempo, agarres?.antesDePaso, (dt) => {
         agarres?.despuesDePaso();
         recuperarFueraDeMesa(dt, agarres);
+        clasificacion.evaluar(dt, tiempo, informar);
       })) return false;
       sincronizarObjetos(piezas);
       return true;
     },
     probarCaida() {
+      if (clasificacion.estado !== 'lista') return false;
       const ocupadas = recipientes.some(({ volumen: { min, max } }) => piezas.some(({ cuerpo }) => {
         if (cuerpo.aabbNeedsUpdate) cuerpo.updateAABB();
         const { lowerBound, upperBound } = cuerpo.aabb;
